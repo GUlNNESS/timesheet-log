@@ -27,8 +27,10 @@ form .wide{grid-column:1/-1}
 .chips:empty{display:none}
 .chips button{padding:4px 10px;font-size:.85rem;border-radius:999px}
 .fld{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut)}
-.cats{display:flex;flex-wrap:wrap;gap:6px}
-.cats button{padding:8px 14px}
+.cats{display:flex;flex-direction:column;gap:6px}
+.catmain,.catrare{display:flex;gap:6px}
+.catmain button{flex:1;padding:12px 8px;font-size:1rem}
+.catrare button{padding:5px 10px;font-size:.8rem;color:var(--mut)}
 .cats button.on{background:var(--acc);color:var(--onacc);border-color:var(--acc);font-weight:600}
 .tm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .row{display:flex;gap:8px;align-items:center}
@@ -158,10 +160,13 @@ function plus2(){
   const e = Math.min(mins(s) + 120, 22 * 60);
   T.end.value = e > mins(s) ? `${pad(Math.floor(e / 60))}:${pad(e % 60)}` : "";
 }
-$("cats").innerHTML = Object.keys(CATS).map(c => `<button type="button" data-cat="${c}">${c}</button>`).join("");
+const MAIN_CATS = ["Travel", "Service", "Misc"];
+const catBtn = c => `<button type="button" data-cat="${c}">${c}</button>`;
+$("cats").innerHTML = `<div class="catmain">${MAIN_CATS.map(catBtn).join("")}</div>` +
+  `<div class="catrare">${Object.keys(CATS).filter(c => !MAIN_CATS.includes(c)).map(catBtn).join("")}</div>`;
 function setCat(c){
   $("cat").value = c;
-  for (const b of $("cats").children) b.classList.toggle("on", b.dataset.cat === c);
+  for (const b of $("cats").querySelectorAll("button")) b.classList.toggle("on", b.dataset.cat === c);
   $("job").required = !NO_JOB.includes(c);
 }
 $("cats").onclick = e => { const b = e.target.closest("button"); if (b) setCat(b.dataset.cat); };
@@ -200,7 +205,7 @@ async function loadJobs(){
 }
 function fillJobs(){
   $("jobs").innerHTML = [...jobs].sort().map(j => `<option value="${esc(j)}">`).join("");
-  $("chips").innerHTML = recent.slice(0, 10).map(j => `<button type="button" data-job="${esc(j)}">${esc(j)}</button>`).join("");
+  $("chips").innerHTML = recent.slice(0, 5).map(j => `<button type="button" data-job="${esc(j)}">${esc(j)}</button>`).join("");
 }
 $("chips").onclick = e => { const b = e.target.closest("button"); if (b) { $("job").value = b.dataset.job; $("job").focus(); } };
 
