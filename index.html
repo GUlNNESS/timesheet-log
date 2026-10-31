@@ -23,6 +23,7 @@ input,select{width:100%;background:var(--bg);border:1px solid var(--line);border
 form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut)}
 form .wide{grid-column:1/-1}
+.tm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .row{display:flex;gap:8px;align-items:center}
 .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .nav strong{font-size:1rem}
@@ -63,8 +64,8 @@ td.act{text-align:right}
     <label>Category<select id="cat"></select></label>
     <label class="wide">Job (Pop Up)<input id="job" list="jobs" autocomplete="off" required></label>
     <datalist id="jobs"></datalist>
-    <label>Start<input type="time" id="start" step="900" required></label>
-    <label>End<input type="time" id="end" step="900" required></label>
+    <label>Start<div class="tm"><select id="start_h" required></select><select id="start_m"></select></div></label>
+    <label>End<div class="tm"><select id="end_h" required></select><select id="end_m"></select></div></label>
     <div class="wide row">
       <button class="pri" id="save">Add entry</button>
       <button type="button" id="cancel" hidden>Cancel edit</button>
@@ -123,6 +124,22 @@ const mins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
 const dur = m => `${Math.floor(m/60)}h${m%60 ? " "+pad(m%60)+"m" : ""}`;
 
 // ---------- UI setup ----------
+
+// Time pickers: hour + minute (00, 15, 30, 45 only). T.start.value / T.end.value read and write "HH:MM".
+function makeTime(id){
+  const h = $(id + "_h"), m = $(id + "_m");
+  h.innerHTML = '<option value="">--</option>' + Array.from({length:24}, (_, i) => `<option>${pad(i)}</option>`).join("");
+  m.innerHTML = ["00","15","30","45"].map(x => `<option>${x}</option>`).join("");
+  return {
+    get value(){ return h.value ? `${h.value}:${m.value}` : ""; },
+    set value(v){
+      if (!v) { h.value = ""; m.value = "00"; return; }
+      const [hh, mm] = v.split(":").map(Number);
+      h.value = pad(hh); m.value = pad(Math.floor(mm / 15) * 15);
+    }
+  };
+}
+const T = {start: makeTime("start"), end: makeTime("end")};
 $("cat").innerHTML = Object.keys(CATS).map(c => `<option>${c}</option>`).join("");
 $("date").value = iso(new Date());
 
@@ -245,25 +262,26 @@ function startEdit(id){
   const e = entries.find(x => x.id === id); if (!e) return;
   editId = id;
   $("date").value = e.date; $("cat").value = e.category; $("job").value = e.job;
-  $("start").value = e.start; $("end").value = e.end;
+  T.start.value = e.start; T.end.value = e.end;
   $("job").required = !NO_JOB.includes(e.category);
   $("save").textContent = "Save changes"; $("cancel").hidden = false;
   $("f").scrollIntoView({behavior:"smooth"});
 }
 function resetForm(){
-  editId = null; $("job").value = ""; $("end").value = "";
+  editId = null; $("job").value = ""; T.end.value = "";
   $("save").textContent = "Add entry"; $("cancel").hidden = true;
   suggestStart();
 }
 function suggestStart(){
   if (editId) return;
   const last = entries.filter(e => e.date === $("date").value).map(e => e.end).sort().pop();
-  if (last) $("start").value = last;
+  if (last) T.start.value = last;
 }
 
 async function save(ev){
   ev.preventDefault();
-  const job = $("job").value.trim(), start = $("start").value, end = $("end").value, cat = $("cat").value;
+  const job = $("job").value.trim(), start = T.start.value, end = T.end.value, cat = $("cat").value;
+  if (!start || !end) return say("Choose a start and end time.");
   if (!job && !NO_JOB.includes(cat)) return say("Enter a job name.");
   if (mins(start) % 15 || mins(end) % 15) return say("Times must be on 00, 15, 30 or 45 minutes.");
   if (mins(end) <= mins(start)) return say("End time must be after start time.");
@@ -276,7 +294,7 @@ async function save(ev){
     if (moved) { weekStart = w; listen(); }
     const wasEdit = !!editId;
     editId = null; $("save").textContent = "Add entry"; $("cancel").hidden = true;
-    $("job").value = ""; $("end").value = ""; $("start").value = end;
+    $("job").value = ""; T.end.value = ""; T.start.value = end;
     if (wasEdit) suggestStart();
   } catch (e) { say("Save failed: " + e.code); }
 }
