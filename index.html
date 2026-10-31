@@ -28,6 +28,15 @@ form .wide{grid-column:1/-1}
 .nav strong{font-size:1rem}
 .day h2{font-size:1rem;margin:0 0 6px;display:flex;justify-content:space-between;align-items:baseline}
 .day h2 span{color:var(--mut);font-weight:400;font-size:.9rem}
+.day h2 b{font-weight:600}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{color:var(--mut);font-weight:400;text-align:left;padding:2px 4px 4px;font-size:.8rem}
+td{padding:6px 4px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.code{font-weight:600;text-align:center}
+td.act{text-align:right}
+.sum{display:flex;gap:16px;margin-top:8px;padding:6px 8px;border-radius:8px;background:var(--bg);font-size:.9rem}
+.sum span{color:var(--mut)}
 .entry{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--line);align-items:center}
 .entry .t{font-variant-numeric:tabular-nums}
 .entry .m{color:var(--mut);font-size:.85rem}
@@ -52,7 +61,7 @@ form .wide{grid-column:1/-1}
   <form id="f" class="card">
     <label>Date<input type="date" id="date" required></label>
     <label>Category<select id="cat"></select></label>
-    <label class="wide">Job<input id="job" list="jobs" autocomplete="off" required></label>
+    <label class="wide">Job (Pop Up)<input id="job" list="jobs" autocomplete="off" required></label>
     <datalist id="jobs"></datalist>
     <label>Start<input type="time" id="start" required></label>
     <label>End<input type="time" id="end" required></label>
@@ -86,7 +95,9 @@ const firebaseConfig = {
 };
 
 // Category -> code typed into the PM tool (matches the "Short" column)
-const CATS = {"Travel":"T","Service":"S","Misc":"M","Annual Leave":"A"};
+const CATS = {"Travel":"T","Service":"S","Misc":"M","Annual Leave":"A","Bank Holiday":"B"};
+// OT estimate (weekdays only): time before STD_START plus time after STD_END
+const STD_START = "09:00", STD_END = "17:30", NO_OT = ["Annual Leave","Bank Holiday"];
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -118,6 +129,7 @@ $("out").onclick = () => signOut(auth);
 $("prev").onclick = () => { weekStart = addDays(weekStart, -7); listen(); };
 $("next").onclick = () => { weekStart = addDays(weekStart, 7); listen(); };
 $("date").onchange = suggestStart;
+$("cat").onchange = () => { $("job").required = $("cat").value !== "Bank Holiday"; };
 $("cancel").onclick = resetForm;
 $("f").onsubmit = save;
 
@@ -135,7 +147,7 @@ onAuthStateChanged(auth, async u => {
 async function loadJobs(){
   try {
     const q = query(col(), orderBy("date","desc"), limit(300));
-    (await getDocs(q)).forEach(d => jobs.add(d.data().job));
+    (await getDocs(q)).forEach(d => { if (d.data().job) jobs.add(d.data().job); });
     fillJobs();
   } catch (e) { say("Could not load recent jobs: " + e.code); }
 }
@@ -164,19 +176,20 @@ function render(){
     const list = entries.filter(e => e.date === key);
     if (i >= 5 && !list.length) continue;
     const total = list.reduce((s,e) => s + mins(e.end) - mins(e.start), 0);
-    html += `<section class="card day"><h2>${fmt(d,{weekday:"long",day:"numeric",month:"short"})}<span>${list.length ? dur(total) : ""}</span></h2>`;
-    html += list.length ? list.map(e => `
-      <div class="entry">
-        <span class="t">${e.start}-${e.end}</span>
-        <span>${esc(e.job)}</span>
-        <span>
-          <button class="link" data-edit="${e.id}">Edit</button>
-          <button class="link del" data-del="${e.id}">Delete</button>
-        </span>
-        <span class="m"></span><span class="m">${esc(e.category)} (${esc(e.code)}), ${dur(mins(e.end)-mins(e.start))}</span>
-      </div>`).join("") + `<div class="row" style="margin-top:8px"><button data-copy="${key}">Copy day for Excel</button></div>`
-      : `<p class="empty">No entries.</p>`;
-    html += `</section>`;
+    html += `<section class="card day"><h2><span style="color:var(--ink);font-size:1rem">${fmt(d,{day:"2-digit",month:"2-digit",year:"2-digit"})} <b>${fmt(d,{weekday:"long"})}</b></span><span>${list.length ? dur(total) : ""}</span></h2>`;
+    if (!list.length) { html += `<p class="empty">No entries.</p></section>`; continue; }
+    html += `<div class="tw"><table><thead><tr><th>Category</th><th>Pop Up</th><th>Time A</th><th>Time B</th><th>Short</th><th></th></tr></thead><tbody>` +
+      list.map(e => `<tr><td>${esc(e.category)}</td><td>${esc(e.job)}</td><td>${e.start}</td><td>${e.end}</td><td class="code">${esc(e.code)}</td>
+        <td class="act"><button class="link" data-edit="${e.id}">Edit</button><button class="link del" data-del="${e.id}">Del</button></td></tr>`).join("") +
+      `</tbody></table></div>`;
+    const finish = list.map(e => e.end).sort().pop();
+    let sum = `<span>Finish</span> ${finish}`;
+    if (i < 5 && !list.some(e => NO_OT.includes(e.category))) {
+      const first = list.map(e => e.start).sort()[0];
+      const ot = Math.max(0, mins(STD_START) - mins(first)) + Math.max(0, mins(finish) - mins(STD_END));
+      sum += ` &nbsp; <span>OT (est.)</span> ${(ot/60).toFixed(2)}h`;
+    }
+    html += `<div class="sum">${sum}</div><div class="row" style="margin-top:8px"><button data-copy="${key}">Copy day for Excel</button></div></section>`;
   }
   $("days").innerHTML = html;
 }
@@ -205,6 +218,7 @@ function startEdit(id){
   editId = id;
   $("date").value = e.date; $("cat").value = e.category; $("job").value = e.job;
   $("start").value = e.start; $("end").value = e.end;
+  $("job").required = e.category !== "Bank Holiday";
   $("save").textContent = "Save changes"; $("cancel").hidden = false;
   $("f").scrollIntoView({behavior:"smooth"});
 }
@@ -222,12 +236,12 @@ function suggestStart(){
 async function save(ev){
   ev.preventDefault();
   const job = $("job").value.trim(), start = $("start").value, end = $("end").value, cat = $("cat").value;
-  if (!job) return say("Enter a job name.");
+  if (!job && cat !== "Bank Holiday") return say("Enter a job name.");
   if (mins(end) <= mins(start)) return say("End time must be after start time.");
   const data = {date: $("date").value, category: cat, code: CATS[cat], job, start, end, updated: Date.now()};
   try {
     if (editId) await setDoc(doc(col(), editId), data); else await addDoc(col(), data);
-    jobs.add(job); fillJobs(); say("");
+    if (job) { jobs.add(job); fillJobs(); } say("");
     const w = mondayOf(parseIso(data.date));
     const moved = iso(w) !== iso(weekStart);
     if (moved) { weekStart = w; listen(); }
