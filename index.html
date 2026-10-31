@@ -8,7 +8,7 @@
 :root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mut:#667085;--line:#dde1e8;--acc:#1f5eff;--onacc:#fff;--bad:#c62828;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--bg:#12151b;--card:#1b2029;--ink:#e8ebf0;--mut:#98a2b3;--line:#2c3340;--acc:#6b95ff;--onacc:#0d1220;--bad:#ef7b7b}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{zoom:.95;margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:640px;margin:0 auto;padding:12px 12px 48px}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 h1{font-size:1.25rem;margin:0}
@@ -89,10 +89,6 @@ td.act{text-align:right}
     <button id="next" aria-label="Next week">Next</button>
   </div>
   <div id="days"></div>
-  <div class="card">
-    <p style="margin:0 0 8px">Import entries from a file</p>
-    <input type="file" id="imp" accept=".json,application/json">
-  </div>
 </section>
 </main>
 
@@ -265,30 +261,6 @@ $("copywk").onclick = async () => {
   if (!tsv) return say("No entries this week.");
   try { await navigator.clipboard.writeText(tsv); say(""); $("copywk").textContent = "Copied"; setTimeout(() => $("copywk").textContent = "Copy week", 1500); }
   catch { say("Copy failed. Your browser blocked clipboard access."); }
-};
-
-// ---------- import (JSON list of entries; safe to repeat, same entry = same id) ----------
-function hash(str){ let h = 5381; for (const c of str) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); }
-$("imp").onchange = async ev => {
-  const file = ev.target.files[0]; if (!file) return;
-  try {
-    const list = JSON.parse(await file.text());
-    if (!Array.isArray(list)) throw new Error("not a list");
-    const ok = list.filter(e => e.date && CATS[e.category] && e.start && e.end);
-    if (!confirm(`Import ${ok.length} entries?`)) { ev.target.value = ""; return; }
-    for (let i = 0; i < ok.length; i += 400) {
-      const b = writeBatch(db);
-      for (const e of ok.slice(i, i + 400)) {
-        const id = `${e.date}_${e.start.replace(":","")}_${e.end.replace(":","")}_${CATS[e.category]}_${hash(e.job || "")}`;
-        b.set(doc(col(), id), {date: e.date, category: e.category, code: CATS[e.category], job: e.job || "", start: e.start, end: e.end, updated: Date.now()});
-      }
-      await b.commit();
-      say(`Imported ${Math.min(i + 400, ok.length)} of ${ok.length}...`);
-    }
-    say(`Imported ${ok.length} entries.`);
-    loadJobs();
-  } catch (e) { say("Import failed: " + (e.code || e.message)); }
-  ev.target.value = "";
 };
 
 // ---------- form ----------
