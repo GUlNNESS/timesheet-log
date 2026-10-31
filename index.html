@@ -26,6 +26,10 @@ form .wide{grid-column:1/-1}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chips:empty{display:none}
 .chips button{padding:4px 10px;font-size:.85rem;border-radius:999px}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut)}
+.cats{display:flex;flex-wrap:wrap;gap:6px}
+.cats button{padding:8px 14px}
+.cats button.on{background:var(--acc);color:var(--onacc);border-color:var(--acc);font-weight:600}
 .tm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .row{display:flex;gap:8px;align-items:center}
 .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
@@ -62,9 +66,10 @@ td.act{text-align:right}
 </section>
 
 <section id="app" hidden>
+  <div class="row" style="margin-bottom:12px"><button id="copywk">Copy week</button></div>
   <form id="f" class="card">
-    <label>Date<input type="date" id="date" required></label>
-    <label>Category<select id="cat"></select></label>
+    <label class="wide">Date<input type="date" id="date" required></label>
+    <div class="fld wide">Category<div class="cats" id="cats"></div><input type="hidden" id="cat"></div>
     <label class="wide">Job (Pop Up)<input id="job" list="jobs" autocomplete="off" required></label>
     <datalist id="jobs"></datalist>
     <div id="chips" class="wide chips"></div>
@@ -81,7 +86,6 @@ td.act{text-align:right}
     <strong id="wk"></strong>
     <button id="next" aria-label="Next week">Next</button>
   </div>
-  <div class="row" style="margin-bottom:12px"><button id="copywk">Copy week</button></div>
   <div id="days"></div>
   <div class="card">
     <p style="margin:0 0 8px">Import entries from a file</p>
@@ -130,21 +134,38 @@ const dur = m => `${Math.floor(m/60)}h${m%60 ? " "+pad(m%60)+"m" : ""}`;
 // ---------- UI setup ----------
 
 // Time pickers: hour + minute (00, 15, 30, 45 only). T.start.value / T.end.value read and write "HH:MM".
-function makeTime(id){
+function makeTime(id, onUserChange){
   const h = $(id + "_h"), m = $(id + "_m");
-  h.innerHTML = '<option value="">--</option>' + Array.from({length:24}, (_, i) => `<option>${pad(i)}</option>`).join("");
-  m.innerHTML = ["00","15","30","45"].map(x => `<option>${x}</option>`).join("");
+  h.innerHTML = '<option value="">--</option>' + Array.from({length:19}, (_, i) => `<option>${pad(i + 4)}</option>`).join("");   // 04 to 22
+  const fillM = only00 => { const keep = m.value; const list = only00 ? ["00"] : ["00","15","30","45"];
+    m.innerHTML = list.map(x => `<option>${x}</option>`).join(""); m.value = list.includes(keep) ? keep : "00"; };
+  fillM(false);
+  h.onchange = () => { m.value = "00"; fillM(h.value === "22"); if (onUserChange) onUserChange(); };   // minutes default to 00; latest time is 22:00
+  m.onchange = () => { if (onUserChange) onUserChange(); };
   return {
     get value(){ return h.value ? `${h.value}:${m.value}` : ""; },
     set value(v){
-      if (!v) { h.value = ""; m.value = "00"; return; }
-      const [hh, mm] = v.split(":").map(Number);
-      h.value = pad(hh); m.value = pad(Math.floor(mm / 15) * 15);
+      if (!v) { h.value = ""; fillM(false); return; }
+      const [hh, mm] = v.split(":").map(Number), q = Math.floor(mm / 15) * 15;
+      h.value = pad(hh); fillM(hh === 22 && q === 0); m.value = pad(q);
     }
   };
 }
-const T = {start: makeTime("start"), end: makeTime("end")};
-$("cat").innerHTML = Object.keys(CATS).map(c => `<option>${c}</option>`).join("");
+const T = {start: makeTime("start", () => plus2()), end: makeTime("end")};
+// End defaults to 2 hours after start (capped at 22:00)
+function plus2(){
+  const s = T.start.value; if (!s) return;
+  const e = Math.min(mins(s) + 120, 22 * 60);
+  T.end.value = e > mins(s) ? `${pad(Math.floor(e / 60))}:${pad(e % 60)}` : "";
+}
+$("cats").innerHTML = Object.keys(CATS).map(c => `<button type="button" data-cat="${c}">${c}</button>`).join("");
+function setCat(c){
+  $("cat").value = c;
+  for (const b of $("cats").children) b.classList.toggle("on", b.dataset.cat === c);
+  $("job").required = !NO_JOB.includes(c);
+}
+$("cats").onclick = e => { const b = e.target.closest("button"); if (b) setCat(b.dataset.cat); };
+setCat("Travel");
 $("date").value = iso(new Date());
 
 $("in").onclick = async () => {
@@ -155,7 +176,6 @@ $("out").onclick = () => signOut(auth);
 $("prev").onclick = () => { weekStart = addDays(weekStart, -7); listen(); };
 $("next").onclick = () => { weekStart = addDays(weekStart, 7); listen(); };
 $("date").onchange = suggestStart;
-$("cat").onchange = () => { $("job").required = !NO_JOB.includes($("cat").value); };
 $("cancel").onclick = resetForm;
 $("f").onsubmit = save;
 
@@ -270,7 +290,7 @@ $("imp").onchange = async ev => {
 function startEdit(id){
   const e = entries.find(x => x.id === id); if (!e) return;
   editId = id;
-  $("date").value = e.date; $("cat").value = e.category; $("job").value = e.job;
+  $("date").value = e.date; setCat(e.category); $("job").value = e.job;
   T.start.value = e.start; T.end.value = e.end;
   $("job").required = !NO_JOB.includes(e.category);
   $("save").textContent = "Save changes"; $("cancel").hidden = false;
@@ -284,7 +304,7 @@ function resetForm(){
 function suggestStart(){
   if (editId) return;
   const last = entries.filter(e => e.date === $("date").value).map(e => e.end).sort().pop();
-  if (last) T.start.value = last;
+  if (last) { T.start.value = last; plus2(); }
 }
 
 async function save(ev){
@@ -303,7 +323,7 @@ async function save(ev){
     if (moved) { weekStart = w; listen(); }
     const wasEdit = !!editId;
     editId = null; $("save").textContent = "Add entry"; $("cancel").hidden = true;
-    $("job").value = ""; T.end.value = ""; T.start.value = end;
+    $("job").value = ""; T.end.value = ""; T.start.value = end; plus2();
     if (wasEdit) suggestStart();
   } catch (e) { say("Save failed: " + e.code); }
 }
