@@ -63,8 +63,8 @@ td.act{text-align:right}
     <label>Category<select id="cat"></select></label>
     <label class="wide">Job (Pop Up)<input id="job" list="jobs" autocomplete="off" required></label>
     <datalist id="jobs"></datalist>
-    <label>Start<input type="time" id="start" required></label>
-    <label>End<input type="time" id="end" required></label>
+    <label>Start<input type="time" id="start" step="900" required></label>
+    <label>End<input type="time" id="end" step="900" required></label>
     <div class="wide row">
       <button class="pri" id="save">Add entry</button>
       <button type="button" id="cancel" hidden>Cancel edit</button>
@@ -76,6 +76,7 @@ td.act{text-align:right}
     <strong id="wk"></strong>
     <button id="next" aria-label="Next week">Next</button>
   </div>
+  <div class="row" style="margin-bottom:12px"><button id="copywk">Copy week</button></div>
   <div id="days"></div>
   <div class="card">
     <p style="margin:0 0 8px">Import entries from a file</p>
@@ -193,7 +194,7 @@ function render(){
       const ot = Math.max(0, mins(STD_START) - mins(first)) + Math.max(0, mins(finish) - mins(STD_END));
       sum += ` &nbsp; <span>OT (est.)</span> ${(ot/60).toFixed(2)}h`;
     }
-    html += `<div class="sum">${sum}</div><div class="row" style="margin-top:8px"><button data-copy="${key}">Copy day for Excel</button></div></section>`;
+    html += `<div class="sum">${sum}</div></section>`;
   }
   $("days").innerHTML = html;
 }
@@ -205,17 +206,15 @@ $("days").onclick = async e => {
     try { await deleteDoc(doc(col(), b.dataset.del)); if (editId === b.dataset.del) resetForm(); }
     catch (err) { say("Delete failed: " + err.code); }
   }
-  if (b.dataset.copy) copyDay(b.dataset.copy, b);
 };
 
-// Excel columns B..F: Category, Job (Pop Up), Time A, Time B, Short
-async function copyDay(key, btn){
-  const tsv = entries.filter(e => e.date === key)
-    .map(e => [e.category, e.job, e.start, e.end, e.code].join("\t")).join("\n");
-  try { await navigator.clipboard.writeText(tsv); btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy day for Excel", 1500); }
+// Copy week: one row per entry, tab-separated: Date, Category, Pop Up, Time A, Time B, Short
+$("copywk").onclick = async () => {
+  const tsv = entries.map(e => [e.date.split("-").reverse().join("/"), e.category, e.job, e.start, e.end, e.code].join("\t")).join("\n");
+  if (!tsv) return say("No entries this week.");
+  try { await navigator.clipboard.writeText(tsv); say(""); $("copywk").textContent = "Copied"; setTimeout(() => $("copywk").textContent = "Copy week", 1500); }
   catch { say("Copy failed. Your browser blocked clipboard access."); }
-}
-
+};
 
 // ---------- import (JSON list of entries; safe to repeat, same entry = same id) ----------
 function hash(str){ let h = 5381; for (const c of str) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); }
@@ -266,6 +265,7 @@ async function save(ev){
   ev.preventDefault();
   const job = $("job").value.trim(), start = $("start").value, end = $("end").value, cat = $("cat").value;
   if (!job && !NO_JOB.includes(cat)) return say("Enter a job name.");
+  if (mins(start) % 15 || mins(end) % 15) return say("Times must be on 00, 15, 30 or 45 minutes.");
   if (mins(end) <= mins(start)) return say("End time must be after start time.");
   const data = {date: $("date").value, category: cat, code: CATS[cat], job, start, end, updated: Date.now()};
   try {
