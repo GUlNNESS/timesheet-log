@@ -77,13 +77,17 @@ td.act{text-align:right}
     <button id="next" aria-label="Next week">Next</button>
   </div>
   <div id="days"></div>
+  <div class="card">
+    <p style="margin:0 0 8px">Import entries from a file</p>
+    <input type="file" id="imp" accept=".json,application/json">
+  </div>
 </section>
 </main>
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,collection,doc,addDoc,setDoc,deleteDoc,query,where,orderBy,limit,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,collection,doc,writeBatch,addDoc,setDoc,deleteDoc,query,where,orderBy,limit,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBYjE6Esp-CKEWY2JWwlbsWQGm20Sl-usU",
@@ -97,7 +101,7 @@ const firebaseConfig = {
 // Category -> code typed into the PM tool (matches the "Short" column)
 const CATS = {"Travel":"T","Service":"S","Misc":"M","Annual Leave":"A","Bank Holiday":"B"};
 // OT estimate (weekdays only): time before STD_START plus time after STD_END
-const STD_START = "09:00", STD_END = "17:30", NO_OT = ["Annual Leave","Bank Holiday"];
+const STD_START = "09:00", STD_END = "17:30", NO_OT = ["Annual Leave","Bank Holiday"], NO_JOB = ["Annual Leave","Bank Holiday"];
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -129,7 +133,7 @@ $("out").onclick = () => signOut(auth);
 $("prev").onclick = () => { weekStart = addDays(weekStart, -7); listen(); };
 $("next").onclick = () => { weekStart = addDays(weekStart, 7); listen(); };
 $("date").onchange = suggestStart;
-$("cat").onchange = () => { $("job").required = $("cat").value !== "Bank Holiday"; };
+$("cat").onchange = () => { $("job").required = !NO_JOB.includes($("cat").value); };
 $("cancel").onclick = resetForm;
 $("f").onsubmit = save;
 
@@ -212,13 +216,38 @@ async function copyDay(key, btn){
   catch { say("Copy failed. Your browser blocked clipboard access."); }
 }
 
+
+// ---------- import (JSON list of entries; safe to repeat, same entry = same id) ----------
+function hash(str){ let h = 5381; for (const c of str) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); }
+$("imp").onchange = async ev => {
+  const file = ev.target.files[0]; if (!file) return;
+  try {
+    const list = JSON.parse(await file.text());
+    if (!Array.isArray(list)) throw new Error("not a list");
+    const ok = list.filter(e => e.date && CATS[e.category] && e.start && e.end);
+    if (!confirm(`Import ${ok.length} entries?`)) { ev.target.value = ""; return; }
+    for (let i = 0; i < ok.length; i += 400) {
+      const b = writeBatch(db);
+      for (const e of ok.slice(i, i + 400)) {
+        const id = `${e.date}_${e.start.replace(":","")}_${e.end.replace(":","")}_${CATS[e.category]}_${hash(e.job || "")}`;
+        b.set(doc(col(), id), {date: e.date, category: e.category, code: CATS[e.category], job: e.job || "", start: e.start, end: e.end, updated: Date.now()});
+      }
+      await b.commit();
+      say(`Imported ${Math.min(i + 400, ok.length)} of ${ok.length}...`);
+    }
+    say(`Imported ${ok.length} entries.`);
+    loadJobs();
+  } catch (e) { say("Import failed: " + (e.code || e.message)); }
+  ev.target.value = "";
+};
+
 // ---------- form ----------
 function startEdit(id){
   const e = entries.find(x => x.id === id); if (!e) return;
   editId = id;
   $("date").value = e.date; $("cat").value = e.category; $("job").value = e.job;
   $("start").value = e.start; $("end").value = e.end;
-  $("job").required = e.category !== "Bank Holiday";
+  $("job").required = !NO_JOB.includes(e.category);
   $("save").textContent = "Save changes"; $("cancel").hidden = false;
   $("f").scrollIntoView({behavior:"smooth"});
 }
@@ -236,7 +265,7 @@ function suggestStart(){
 async function save(ev){
   ev.preventDefault();
   const job = $("job").value.trim(), start = $("start").value, end = $("end").value, cat = $("cat").value;
-  if (!job && cat !== "Bank Holiday") return say("Enter a job name.");
+  if (!job && !NO_JOB.includes(cat)) return say("Enter a job name.");
   if (mins(end) <= mins(start)) return say("End time must be after start time.");
   const data = {date: $("date").value, category: cat, code: CATS[cat], job, start, end, updated: Date.now()};
   try {
