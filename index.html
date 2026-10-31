@@ -23,6 +23,9 @@ input,select{width:100%;background:var(--bg);border:1px solid var(--line);border
 form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut)}
 form .wide{grid-column:1/-1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips:empty{display:none}
+.chips button{padding:4px 10px;font-size:.85rem;border-radius:999px}
 .tm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .row{display:flex;gap:8px;align-items:center}
 .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
@@ -64,6 +67,7 @@ td.act{text-align:right}
     <label>Category<select id="cat"></select></label>
     <label class="wide">Job (Pop Up)<input id="job" list="jobs" autocomplete="off" required></label>
     <datalist id="jobs"></datalist>
+    <div id="chips" class="wide chips"></div>
     <label>Start<div class="tm"><select id="start_h" required></select><select id="start_m"></select></div></label>
     <label>End<div class="tm"><select id="end_h" required></select><select id="end_m"></select></div></label>
     <div class="wide row">
@@ -111,7 +115,7 @@ const db = getFirestore(app);
 const $ = id => document.getElementById(id);
 
 let user = null, weekStart = mondayOf(new Date()), entries = [], editId = null, unsub = null;
-const jobs = new Set();
+const jobs = new Set(), recent = [];
 
 // ---------- date helpers (local time) ----------
 const pad = n => String(n).padStart(2, "0");
@@ -169,11 +173,16 @@ onAuthStateChanged(auth, async u => {
 async function loadJobs(){
   try {
     const q = query(col(), orderBy("date","desc"), limit(300));
-    (await getDocs(q)).forEach(d => { if (d.data().job) jobs.add(d.data().job); });
+    recent.length = 0;
+    (await getDocs(q)).forEach(d => { const j = d.data().job; if (j) { jobs.add(j); if (!recent.includes(j)) recent.push(j); } });
     fillJobs();
   } catch (e) { say("Could not load recent jobs: " + e.code); }
 }
-function fillJobs(){ $("jobs").innerHTML = [...jobs].sort().map(j => `<option value="${esc(j)}">`).join(""); }
+function fillJobs(){
+  $("jobs").innerHTML = [...jobs].sort().map(j => `<option value="${esc(j)}">`).join("");
+  $("chips").innerHTML = recent.slice(0, 10).map(j => `<button type="button" data-job="${esc(j)}">${esc(j)}</button>`).join("");
+}
+$("chips").onclick = e => { const b = e.target.closest("button"); if (b) { $("job").value = b.dataset.job; $("job").focus(); } };
 
 const col = () => collection(db, "users", user.uid, "entries");
 
@@ -288,7 +297,7 @@ async function save(ev){
   const data = {date: $("date").value, category: cat, code: CATS[cat], job, start, end, updated: Date.now()};
   try {
     if (editId) await setDoc(doc(col(), editId), data); else await addDoc(col(), data);
-    if (job) { jobs.add(job); fillJobs(); } say("");
+    if (job) { jobs.add(job); const i = recent.indexOf(job); if (i >= 0) recent.splice(i, 1); recent.unshift(job); fillJobs(); } say("");
     const w = mondayOf(parseIso(data.date));
     const moved = iso(w) !== iso(weekStart);
     if (moved) { weekStart = w; listen(); }
