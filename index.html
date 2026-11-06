@@ -1,196 +1,309 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en-GB">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timesheet log</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; color: #333; }
-        h1 { font-size: 24px; margin-bottom: 20px; }
-        .btn { padding: 6px 12px; margin-right: 8px; border: 1px solid #ccc; background: #fafafa; cursor: pointer; border-radius: 4px; font-size: 14px; }
-        .btn:hover { background: #eaeaea; }
-        .btn-green { background: #2da44e; color: white; border-color: #24823e; }
-        .btn-green:hover { background: #2c974b; }
-        .form-row { margin: 15px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        label { font-weight: bold; font-size: 14px; }
-        input, select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f5f5f5; }
-        .nav-links { margin-top: 15px; font-size: 14px; }
-        .nav-links a { color: #0969da; text-decoration: none; margin-right: 10px; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timesheet log</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mut:#667085;--line:#dde1e8;--acc:#1f5eff;--onacc:#fff;--bad:#c62828;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--card:#1b2029;--ink:#e8ebf0;--mut:#98a2b3;--line:#2c3340;--acc:#6b95ff;--onacc:#0d1220;--bad:#ef7b7b}}
+*{box-sizing:border-box}
+body{zoom:.95;margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:12px 12px 48px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h1{font-size:1.25rem;margin:0}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.pri{background:var(--acc);color:var(--onacc);border-color:var(--acc);font-weight:600}
+button.link{border:0;background:none;color:var(--acc);padding:4px 6px}
+button.del{color:var(--bad)}
+input,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut)}
+form .wide{grid-column:1/-1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips:empty{display:none}
+.chips button{padding:4px 10px;font-size:.85rem;border-radius:999px}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mut)}
+.cats{display:flex;flex-direction:column;gap:6px}
+.catmain,.catrare{display:flex;gap:6px}
+.catmain button{flex:1;padding:12px 8px;font-size:1rem}
+.catrare button{padding:5px 10px;font-size:.8rem;color:var(--mut)}
+.cats button.on{background:var(--acc);color:var(--onacc);border-color:var(--acc);font-weight:600}
+.tm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.row{display:flex;gap:8px;align-items:center}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.nav strong{font-size:1rem}
+.day h2{font-size:1rem;margin:0 0 6px;display:flex;justify-content:space-between;align-items:baseline}
+.day h2 span{color:var(--mut);font-weight:400;font-size:.9rem}
+.day h2 b{font-weight:600}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{color:var(--mut);font-weight:400;text-align:left;padding:2px 4px 4px;font-size:.8rem}
+td{padding:6px 4px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.code{font-weight:600;text-align:center}
+td.act{text-align:right}
+.sum{display:flex;gap:16px;margin-top:8px;padding:6px 8px;border-radius:8px;background:var(--bg);font-size:.9rem}
+.sum span{color:var(--mut)}
+.entry{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--line);align-items:center}
+.entry .t{font-variant-numeric:tabular-nums}
+.entry .m{color:var(--mut);font-size:.85rem}
+.empty{color:var(--mut);font-size:.9rem;margin:0}
+#msg{color:var(--bad);min-height:1.2em;font-size:.9rem}
+#login{text-align:center;padding:32px 12px}
+[hidden]{display:none!important}
+</style>
 </head>
 <body>
+<main>
+<header><h1>Timesheet log</h1><button id="out" class="link" hidden>Sign out</button></header>
 
-    <h1>Timesheet log</h1>
-    
-    <div>
-        <button class="btn" onclick="alert('Sign in functionality goes here')">Sign in with Google</button>
-        <button class="btn" onclick="copyWeek()">Copy week</button>
-        <!-- The new annotation button running alongside your existing setup -->
-        <button class="btn btn-green" onclick="copyWageSlipAnnotation()">Annotate Wage Slip</button>
+<p id="msg" role="status"></p>
+
+<section id="login" class="card" hidden>
+  <p>Sign in to log your hours.</p>
+  <button id="in" class="pri">Sign in with Google</button>
+</section>
+
+<section id="app" hidden>
+  <div class="row" style="margin-bottom:12px"><button id="copywk">Copy week</button></div>
+  <form id="f" class="card">
+    <label class="wide">Date<input type="date" id="date" required></label>
+    <div class="fld wide">Category<div class="cats" id="cats"></div><input type="hidden" id="cat"></div>
+    <label class="wide">Job (Pop Up)<input id="job" list="jobs" autocomplete="off" required></label>
+    <datalist id="jobs"></datalist>
+    <div id="chips" class="wide chips"></div>
+    <label>Start<div class="tm"><select id="start_h" required></select><select id="start_m"></select></div></label>
+    <label>End<div class="tm"><select id="end_h" required></select><select id="end_m"></select></div></label>
+    <div class="wide row">
+      <button class="pri" id="save">Add entry</button>
+      <button type="button" id="cancel" hidden>Cancel edit</button>
     </div>
+  </form>
 
-    <div class="form-row">
-        <div>
-            <label>Date</label><br>
-            <input type="date" id="txDate">
-        </div>
-        <div>
-            <label>Category</label><br>
-            <select id="txCategory">
-                <option value="BAU">BAU</option>
-                <option value="Project">Project</option>
-                <option value="Overtime">Overtime</option>
-            </select>
-        </div>
-        <div>
-            <label>Job (Pop Up)</label><br>
-            <input type="text" id="txJob" placeholder="e.g. Meeting">
-        </div>
-        <div>
-            <label>Start</label><br>
-            <input type="time" id="txStart">
-        </div>
-        <div>
-            <label>End</label><br>
-            <input type="time" id="txEnd">
-        </div>
-    </div>
+  <div class="nav">
+    <button id="prev" aria-label="Previous week">Prev</button>
+    <strong id="wk"></strong>
+    <button id="next" aria-label="Next week">Next</button>
+  </div>
+  <div id="days"></div>
+</section>
+</main>
 
-    <div>
-        <button class="btn" onclick="addEntry()">Add entry</button>
-        <button class="btn" onclick="cancelEdit()">Cancel edit</button>
-    </div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,collection,doc,writeBatch,addDoc,setDoc,deleteDoc,query,where,orderBy,limit,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Job (Pop Up)</th>
-                <th>Start</th>
-                <th>End</th>
-            </tr>
-        </thead>
-        <tbody id="logTableBody">
-            <!-- Logged rows will appear here -->
-        </tbody>
-    </table>
+const firebaseConfig = {
+  apiKey: "AIzaSyBYjE6Esp-CKEWY2JWwlbsWQGm20Sl-usU",
+  authDomain: "timesheet-log-b171f.firebaseapp.com",
+  projectId: "timesheet-log-b171f",
+  storageBucket: "timesheet-log-b171f.firebasestorage.app",
+  messagingSenderId: "985825580832",
+  appId: "1:985825580832:web:9c2ef3f4cc896512612945"
+};
 
-    <div class="nav-links">
-        <a href="#" onclick="alert('Previous week')">Prev</a>
-        <a href="#" onclick="alert('Next week')">Next</a>
-    </div>
+// Category -> code typed into the PM tool (matches the "Short" column)
+const CATS = {"Travel":"T","Service":"S","Misc":"M","Annual Leave":"A","Bank Holiday":"B"};
+// OT estimate (weekdays only): time before STD_START plus time after STD_END
+const STD_START = "09:00", STD_END = "17:30", NO_OT = ["Annual Leave","Bank Holiday"], NO_JOB = ["Annual Leave","Bank Holiday"];
 
-    <script>
-        // Array holding your logged shifts for the current week
-        let logEntries = [
-            { date: '2026-10-26', category: 'BAU', job: 'System Setup', start: '08:00', end: '16:30' }, // 8.5
-            { date: '2026-10-27', category: 'BAU', job: 'Dev Support', start: '08:00', end: '16:30' },  // 8.5
-            { date: '2026-10-28', category: 'BAU', job: 'Deployment', start: '08:00', end: '19:15' },   // 11.25
-            { date: '2026-10-29', category: 'BAU', job: 'Code Review', start: '08:00', end: '18:45' },  // 10.75
-            { date: '2026-10-30', category: 'BAU', job: 'Maintenance', start: '08:00', end: '18:15' }   // 10.25
-        ];
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
 
-        // Renders existing entries into the table on page load
-        function renderTable() {
-            const tbody = document.getElementById('logTableBody');
-            tbody.innerHTML = '';
-            logEntries.forEach(entry => {
-                const row = `<tr>
-                    <td>${entry.date}</td>
-                    <td>${entry.category}</td>
-                    <td>${entry.job}</td>
-                    <td>${entry.start}</td>
-                    <td>${entry.end}</td>
-                </tr>`;
-                tbody.insertAdjacentHTML('beforeend', row);
-            });
-        }
+let user = null, weekStart = mondayOf(new Date()), entries = [], editId = null, unsub = null;
+const jobs = new Set(), recent = [];
 
-        // Form handling functions
-        function addEntry() {
-            const date = document.getElementById('txDate').value;
-            const category = document.getElementById('txCategory').value;
-            const job = document.getElementById('txJob').value;
-            const start = document.getElementById('txStart').value;
-            const end = document.getElementById('txEnd').value;
+// ---------- date helpers (local time) ----------
+const pad = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+function parseIso(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
+function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+function mondayOf(d){ const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return x; }
+const fmt = (d, o) => d.toLocaleDateString("en-GB", o);
+const mins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+const dur = m => `${Math.floor(m/60)}h${m%60 ? " "+pad(m%60)+"m" : ""}`;
 
-            if(date && job && start && end) {
-                logEntries.push({ date, category, job, start, end });
-                renderTable();
-                cancelEdit();
-            } else {
-                alert("Please fill in all fields.");
-            }
-        }
+// ---------- UI setup ----------
 
-        function cancelEdit() {
-            document.getElementById('txDate').value = '';
-            document.getElementById('txJob').value = '';
-            document.getElementById('txStart').value = '';
-            document.getElementById('txEnd').value = '';
-        }
+// Time pickers: hour + minute (00, 15, 30, 45 only). T.start.value / T.end.value read and write "HH:MM".
+function makeTime(id, onUserChange){
+  const h = $(id + "_h"), m = $(id + "_m");
+  h.innerHTML = '<option value="">--</option>' + Array.from({length:19}, (_, i) => `<option>${pad(i + 4)}</option>`).join("");   // 04 to 22
+  const fillM = only00 => { const keep = m.value; const list = only00 ? ["00"] : ["00","15","30","45"];
+    m.innerHTML = list.map(x => `<option>${x}</option>`).join(""); m.value = list.includes(keep) ? keep : "00"; };
+  fillM(false);
+  h.onchange = () => { m.value = "00"; fillM(h.value === "22"); if (onUserChange) onUserChange(); };   // minutes default to 00; latest time is 22:00
+  m.onchange = () => { if (onUserChange) onUserChange(); };
+  return {
+    get value(){ return h.value ? `${h.value}:${m.value}` : ""; },
+    set value(v){
+      if (!v) { h.value = ""; fillM(false); return; }
+      const [hh, mm] = v.split(":").map(Number), q = Math.floor(mm / 15) * 15;
+      h.value = pad(hh); fillM(hh === 22 && q === 0); m.value = pad(q);
+    }
+  };
+}
+const T = {start: makeTime("start", () => plus2()), end: makeTime("end")};
+// End defaults to 2 hours after start (capped at 22:00)
+function plus2(){
+  const s = T.start.value; if (!s) return;
+  const e = Math.min(mins(s) + 120, 22 * 60);
+  T.end.value = e > mins(s) ? `${pad(Math.floor(e / 60))}:${pad(e % 60)}` : "";
+}
+const MAIN_CATS = ["Travel", "Service", "Misc"];
+const catBtn = c => `<button type="button" data-cat="${c}">${c}</button>`;
+$("cats").innerHTML = `<div class="catmain">${MAIN_CATS.map(catBtn).join("")}</div>` +
+  `<div class="catrare">${Object.keys(CATS).filter(c => !MAIN_CATS.includes(c)).map(catBtn).join("")}</div>`;
+function setCat(c){
+  $("cat").value = c;
+  for (const b of $("cats").querySelectorAll("button")) b.classList.toggle("on", b.dataset.cat === c);
+  $("job").required = !NO_JOB.includes(c);
+}
+$("cats").onclick = e => { const b = e.target.closest("button"); if (b) setCat(b.dataset.cat); };
+setCat("Travel");
+$("date").value = iso(new Date());
 
-        // Your original functional handler for copying tab-separated rows for AHK
-        function copyWeek() {
-            if (logEntries.length === 0) return alert("Nothing to copy!");
-            let clipText = "";
-            logEntries.forEach(e => {
-                // Formatting date back to DD/MM/YYYY for the AHK script parser
-                const [y, m, d] = e.date.split('-');
-                const formattedDate = `${d}/${m}/${y}`;
-                clipText += `${formattedDate}\t${e.category}\t${e.job}\t${e.start}\t${e.end}\tShort\n`;
-            });
-            navigator.clipboard.writeText(clipText.trim()).then(() => alert("Week copied for AHK script!"));
-        }
+$("in").onclick = async () => {
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) { say("Sign-in failed: " + e.code); }
+};
+$("out").onclick = () => signOut(auth);
+$("prev").onclick = () => { weekStart = addDays(weekStart, -7); listen(); };
+$("next").onclick = () => { weekStart = addDays(weekStart, 7); listen(); };
+$("date").onchange = suggestStart;
+$("cancel").onclick = resetForm;
+$("f").onsubmit = save;
 
-        // NEW: Generates the structured, mathematical text block for your PDF wage slips
-        function copyWageSlipAnnotation() {
-            const annualSalary = 51249.96;
-            const otRate = (annualSalary / 52 / 5 / 7.5 * 1.5).toFixed(3); // Result: 39.423
+function say(t){ $("msg").textContent = t || ""; }
 
-            if (!logEntries || logEntries.length === 0) return alert("No entries found!");
+onAuthStateChanged(auth, async u => {
+  user = u;
+  $("login").hidden = !!u; $("app").hidden = !u; $("out").hidden = !u;
+  if (unsub) { unsub(); unsub = null; }
+  if (!u) return;
+  loadJobs();
+  listen();
+});
 
-            let totalHours = 0;
-            
-            // Sort to ensure the top entry reflects the beginning of the work week
-            const sorted = [...logEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
-            
-            // Format week commencing date format cleanly (e.g. 26-Oct-26)
-            const firstDateObj = new Date(sorted[0].date);
-            const options = { day: '2-digit', month: 'short', year: '2-digit' };
-            const wcDate = firstDateObj.toLocaleDateString('en-GB', options).replace(/ /g, '-');
+async function loadJobs(){
+  try {
+    const q = query(col(), orderBy("date","desc"), limit(300));
+    recent.length = 0;
+    (await getDocs(q)).forEach(d => { const j = d.data().job; if (j) { jobs.add(j); if (!recent.includes(j)) recent.push(j); } });
+    fillJobs();
+  } catch (e) { say("Could not load recent jobs: " + e.code); }
+}
+function fillJobs(){
+  $("jobs").innerHTML = [...jobs].sort().map(j => `<option value="${esc(j)}">`).join("");
+  $("chips").innerHTML = recent.slice(0, 5).map(j => `<button type="button" data-job="${esc(j)}">${esc(j)}</button>`).join("");
+}
+$("chips").onclick = e => { const b = e.target.closest("button"); if (b) { $("job").value = b.dataset.job; $("job").focus(); } };
 
-            // Sum up total elapsed decimal hours
-            sorted.forEach(e => {
-                if (e.start && e.end) {
-                    let [sH, sM] = e.start.split(':').map(Number);
-                    let [eH, eM] = e.end.split(':').map(Number);
-                    totalHours += (eH + eM/60) - (sH + sM/60);
-                }
-            });
+const col = () => collection(db, "users", user.uid, "entries");
 
-            // Isolate net overtime and calculate payout value
-            let otHours = Math.max(0, totalHours - 37.5).toFixed(2);
-            let amountPaid = (otHours * otRate).toFixed(2);
+function listen(){
+  if (unsub) unsub();
+  const q = query(col(), where("date", ">=", iso(weekStart)), where("date", "<=", iso(addDays(weekStart, 6))));
+  unsub = onSnapshot(q, snap => {
+    entries = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    entries.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
+    say(""); render(); suggestStart();
+  }, e => say("Could not load entries: " + e.code));
+}
 
-            // Construct exact layout format matching your historical PDF annotations
-            const textBlock = `£${annualSalary.toFixed(2)} pa equates to OT rate of ${otRate}
-(${annualSalary.toFixed(2)}/52/5/7.5)x1.5 = ${otRate}
-Therefore OT AMOUNT PAID = UNITS x ${otRate}
-w/c          Hours
-${wcDate}    ${otHours}
-TOTAL        ${otHours}
-Claimed      ${otHours}  £${amountPaid}`;
+// ---------- render ----------
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-            navigator.clipboard.writeText(textBlock).then(() => alert("Overtime text block copied! Paste directly onto your PDF."));
-        }
+function render(){
+  $("wk").textContent = `${fmt(weekStart,{day:"numeric",month:"short"})} to ${fmt(addDays(weekStart,6),{day:"numeric",month:"short",year:"numeric"})}`;
+  let html = "";
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(weekStart, i), key = iso(d);
+    const list = entries.filter(e => e.date === key);
+    if (i >= 5 && !list.length) continue;
+    const total = list.reduce((s,e) => s + mins(e.end) - mins(e.start), 0);
+    html += `<section class="card day"><h2><span style="color:var(--ink);font-size:1rem">${fmt(d,{day:"2-digit",month:"2-digit",year:"2-digit"})} <b>${fmt(d,{weekday:"long"})}</b></span><span>${list.length ? dur(total) : ""}</span></h2>`;
+    if (!list.length) { html += `<p class="empty">No entries.</p></section>`; continue; }
+    html += `<div class="tw"><table><thead><tr><th>Category</th><th>Pop Up</th><th>Time A</th><th>Time B</th><th>Short</th><th></th></tr></thead><tbody>` +
+      list.map(e => `<tr><td>${esc(e.category)}</td><td>${esc(e.job)}</td><td>${e.start}</td><td>${e.end}</td><td class="code">${esc(e.code)}</td>
+        <td class="act"><button class="link" data-edit="${e.id}">Edit</button><button class="link del" data-del="${e.id}">Del</button></td></tr>`).join("") +
+      `</tbody></table></div>`;
+    const finish = list.map(e => e.end).sort().pop();
+    let sum = `<span>Finish</span> ${finish}`;
+    if (i < 5 && !list.some(e => NO_OT.includes(e.category))) {
+      const first = list.map(e => e.start).sort()[0];
+      const ot = Math.max(0, mins(STD_START) - mins(first)) + Math.max(0, mins(finish) - mins(STD_END));
+      sum += ` &nbsp; <span>OT (est.)</span> ${(ot/60).toFixed(2)}h`;
+    }
+    html += `<div class="sum">${sum}</div></section>`;
+  }
+  $("days").innerHTML = html;
+}
 
-        // Initialize view
-        renderTable();
-    </script>
+$("days").onclick = async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.edit) startEdit(b.dataset.edit);
+  if (b.dataset.del && confirm("Delete this entry?")) {
+    try { await deleteDoc(doc(col(), b.dataset.del)); if (editId === b.dataset.del) resetForm(); }
+    catch (err) { say("Delete failed: " + err.code); }
+  }
+};
+
+// Copy week: one row per entry, tab-separated: Date, Category, Pop Up, Time A, Time B, Short
+$("copywk").onclick = async () => {
+  const tsv = entries.map(e => [e.date.split("-").reverse().join("/"), e.category, e.job, e.start, e.end, e.code].join("\t")).join("\n");
+  if (!tsv) return say("No entries this week.");
+  try { await navigator.clipboard.writeText(tsv); say(""); $("copywk").textContent = "Copied"; setTimeout(() => $("copywk").textContent = "Copy week", 1500); }
+  catch { say("Copy failed. Your browser blocked clipboard access."); }
+};
+
+// ---------- form ----------
+function startEdit(id){
+  const e = entries.find(x => x.id === id); if (!e) return;
+  editId = id;
+  $("date").value = e.date; setCat(e.category); $("job").value = e.job;
+  T.start.value = e.start; T.end.value = e.end;
+  $("job").required = !NO_JOB.includes(e.category);
+  $("save").textContent = "Save changes"; $("cancel").hidden = false;
+  $("f").scrollIntoView({behavior:"smooth"});
+}
+function resetForm(){
+  editId = null; $("job").value = ""; T.end.value = "";
+  $("save").textContent = "Add entry"; $("cancel").hidden = true;
+  suggestStart();
+}
+function suggestStart(){
+  if (editId) return;
+  const last = entries.filter(e => e.date === $("date").value).map(e => e.end).sort().pop();
+  if (last) { T.start.value = last; plus2(); }
+}
+
+async function save(ev){
+  ev.preventDefault();
+  const job = $("job").value.trim(), start = T.start.value, end = T.end.value, cat = $("cat").value;
+  if (!start || !end) return say("Choose a start and end time.");
+  if (!job && !NO_JOB.includes(cat)) return say("Enter a job name.");
+  if (mins(start) % 15 || mins(end) % 15) return say("Times must be on 00, 15, 30 or 45 minutes.");
+  if (mins(end) <= mins(start)) return say("End time must be after start time.");
+  const data = {date: $("date").value, category: cat, code: CATS[cat], job, start, end, updated: Date.now()};
+  try {
+    if (editId) await setDoc(doc(col(), editId), data); else await addDoc(col(), data);
+    if (job) { jobs.add(job); const i = recent.indexOf(job); if (i >= 0) recent.splice(i, 1); recent.unshift(job); fillJobs(); } say("");
+    const w = mondayOf(parseIso(data.date));
+    const moved = iso(w) !== iso(weekStart);
+    if (moved) { weekStart = w; listen(); }
+    const wasEdit = !!editId;
+    editId = null; $("save").textContent = "Add entry"; $("cancel").hidden = true;
+    $("job").value = ""; T.end.value = ""; T.start.value = end; plus2();
+    if (wasEdit) suggestStart();
+  } catch (e) { say("Save failed: " + e.code); }
+}
+</script>
 </body>
 </html>
